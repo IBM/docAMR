@@ -48,6 +48,14 @@ python doc_amr.py
 
 default value for ```--pairwise-coref-rel``` is ```same-as```
 
-# Evaluate docAMR 
+# Evaluate docAMR (docSmatch) 
 
-Coming soon ....
+Use docSmatch the same way as the standard Smatch. 
+
+```
+python docSmatch/smatch.py -f <amr1> <amr2>
+```
+
+It assumes that ```:snt``` relations connect sentences to the root. Moreover, it assumes that the numeric suffix of ```:snt``` is the sentence number and that the matching sentence numbers in the two AMRs are aligned.
+
+Coref-subscore coming soon ....
