@@ -1,6 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""
+This code is taken from https://github.com/snowblink14/smatch
+
+and changed for DocAMR to:
+1. constrain smatch node mapping based on sentence alignements to make it faster
+2. compute coref subscore for DocAMR 
+"""
+
 
 """
 This script computes smatch score between two AMRs.
