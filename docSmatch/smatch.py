@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+
 """
 This code is taken from https://github.com/snowblink14/smatch
 
@@ -993,15 +994,81 @@ def get_amr_match(cur_amr1, cur_amr2, sent_num=1, justinstance=False, justattrib
 
     total_nums = (best_match_num, test_triple_num, gold_triple_num)
     if coref:
+        amr1.find_coref()
+        amr2.find_coref()
+        alignment = SMATCH_Alignment(best_mapping, pred_amr=amr1, gold_amr=amr2)
+        #for type,rel,rel2 in alignment.iterate_errors():
+        #     print(type,rel,rel2)
+        #     print()
+        # named entities
+        # bridging relations
+        # other
         ne_scores = Scores()
         bridging_scores = Scores()
         other_scores = Scores()
+        for n in amr2.coref_nodes:
+            if n in amr2.named_entities:
+                ne_scores.increment(gold=1)
+            else:
+                other_scores.increment(gold=1)
+            ns = alignment.gold_to_pred(node=n)
+            for n2 in ns:
+                if n2 not in amr1.coref_nodes:
+                    continue
+                #if n in amr2.named_entities:
+                #    ne_scores.increment(pred=1)
+                #else:
+                #    other_scores.increment(pred=1)
+                if alignment.gold_concepts[n]==alignment.pred_concepts[n2]:
+                    if n in amr2.named_entities:
+                        ne_scores.increment(num=1)
+                    else:
+                        other_scores.increment(num=1)
+        for n in amr1.coref_nodes:
+            if n in amr1.named_entities:
+                ne_scores.increment(pred=1)
+            else:
+                other_scores.increment(pred=1)
+                
+        #ne_scores = Scores()
+        #bridging_scores = Scores()
+        #other_scores = Scores()                
+        for r,s,t in amr2.coref_edges:
+            if r in ['part','subset']:
+                bridging_scores.increment(gold=1)
+            else:
+                other_scores.increment(gold=1)
+            rels = alignment.edge_align_inv[(r,s,t)]
+            for rel in rels:
+                if rel not in amr1.coref_edges:
+                    continue
+                #if r in ['part', 'subset']:
+                #    bridging_scores.increment(pred=1)
+                #else:
+                #    other_scores.increment(pred=1)
+                r2, s2, t2 = rel
+                if r == r2:
+                    if r in ['part', 'subset']:
+                        bridging_scores.increment(num=1)
+                    else:
+                        other_scores.increment(num=1)
+        for r,s,t in amr1.coref_edges:
+            if r in ['part','subset']:
+                bridging_scores.increment(pred=1)
+            else:
+                other_scores.increment(pred=1)
+                
         subscores['Named Entity Coref'] = ne_scores
         subscores['Bridging Relations'] = bridging_scores
         subscores['Other Coref'] = other_scores
         coref_scores = Scores()
+        for scores in [ne_scores, bridging_scores, other_scores]:
+            coref_scores.update(scores)
         subscores['Total Coref'] = coref_scores
         noncoref_scores = Scores()
+        noncoref_scores.set(num=best_match_num-coref_scores.num,
+                            gold=gold_triple_num-coref_scores.gold_total,
+                            pred=test_triple_num-coref_scores.pred_total)
         subscores['Non-Coref'] = noncoref_scores
     return total_nums, subscores
 
@@ -1045,8 +1112,9 @@ def score_amr_pairs(f1, f2, justinstance=False, justattribute=False, justrelatio
     todo = []
     todo.append(('Overall Score:', total_scores))
     if coref:
-        print("Coref Score coming soon!!")
-        #todo.append(('Coref Score', subscores['Total Coref'])) 
+        todo.append(('Coref Score', subscores['Total Coref'])) 
+        #for label in subscores:
+        #    todo.append((label, subscores[label]))
 
     for label, scores in todo:
         print(label)

@@ -87,7 +87,56 @@ class AMR(object):
         self.find_coref()
 
     def find_coref(self):
-        return
+        self.coref_nodes = []
+        self.coref_edges = []
+        self.named_entities = []
+        sentences_by_node = {n:set() for n in self.nodes}
+        for i,nodes_in_sentence in enumerate(self.nodes_by_sentence):
+            for n in nodes_in_sentence:
+                sentences_by_node[n].add(i)
+        candidates = [n for n in sentences_by_node if len(sentences_by_node[n])>1]
+        relations_to_node = {n:[] for n in self.nodes}
+        for i,s in enumerate(self.nodes):
+            for rel in self.relations[i]:
+                r, t, is_inverted = rel
+                if r not in ['coref','part','subset']:
+                    if is_inverted:
+                        relations_to_node[s].append((r+'-of', t))
+                    else:
+                        relations_to_node[t].append((r, s))
+        # coref nodes
+        special = ['implicit-role', 'coref-entity']
+        for n, concept in zip(self.nodes, self.node_values):
+            if concept in special:
+                self.coref_nodes.append(n)
+        _coref_nodes = set()
+        for n in self.coref_nodes:
+            _coref_nodes.add(n)
+        for n in candidates[:]:
+            if len(relations_to_node[n]) < 2: continue
+            rels = [rel for rel in relations_to_node[n] if sentences_by_node[rel[1]]!=sentences_by_node[n]]
+            if len(rels) < 2: continue
+            parent1 = rels[0][1]
+            if any(sentences_by_node[parent2]!=sentences_by_node[parent1] for _,parent2 in rels):
+                _coref_nodes.add(n)
+        # coref edges
+        for i,s in enumerate(self.nodes):
+            for rel in self.relations[i]:
+                r, t, _ = rel
+                if t in _coref_nodes:
+                    self.coref_edges.append((r, s, t))
+                elif s in _coref_nodes and r in ['coref']:
+                    self.coref_edges.append((r, s, t))
+                elif r in ['part','subset'] and sentences_by_node[s]!=sentences_by_node[t]:
+                    self.coref_edges.append((r, s, t))
+        # named entities
+        _named_entities = set()
+        for i, s in enumerate(self.nodes):
+            for rel in self.relations[i]:
+                r, t, inv = rel
+                if r == 'name':
+                    _named_entities.add(s)
+        self.named_entities = [n for n in _named_entities]    
 
     def categorize_nodes_by_sentence(self):
 
