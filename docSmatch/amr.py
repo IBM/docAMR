@@ -7,10 +7,9 @@ This code is taken from https://github.com/snowblink14/smatch
 and changed for DocAMR to:
 1. constrain smatch node mapping based on sentence alignements to make it faster
 2. compute coref subscore for DocAMR 
-"""
 
+-----
 
-"""
 AMR (Abstract Meaning Representation) structure
 For detailed description of AMR, see http://www.isi.edu/natural-language/amr/a.pdf
 
@@ -89,20 +88,22 @@ class AMR(object):
 
     def find_coref(self):
         self.coref_nodes = []
+        self.coref_edges = []
         self.named_entities = []
-        sentences_by_node = {n: set() for n in self.nodes}
-        for i, nodes_in_sentence in enumerate(self.nodes_by_sentence):
+        sentences_by_node = {n:set() for n in self.nodes}
+        for i,nodes_in_sentence in enumerate(self.nodes_by_sentence):
             for n in nodes_in_sentence:
                 sentences_by_node[n].add(i)
-        candidates = [n for n in sentences_by_node if len(sentences_by_node[n]) > 1]
-        relations_to_node = {n: [] for n in self.nodes}
-        for i, s in enumerate(self.nodes):
+        candidates = [n for n in sentences_by_node if len(sentences_by_node[n])>1]
+        relations_to_node = {n:[] for n in self.nodes}
+        for i,s in enumerate(self.nodes):
             for rel in self.relations[i]:
                 r, t, is_inverted = rel
-                if is_inverted:
-                    relations_to_node[s].append((r + '-of', t))
-                else:
-                    relations_to_node[t].append((r, s))
+                if r not in ['coref','part','subset']:
+                    if is_inverted:
+                        relations_to_node[s].append((r+'-of', t))
+                    else:
+                        relations_to_node[t].append((r, s))
         # coref nodes
         special = ['implicit-role', 'coref-entity']
         for n, concept in zip(self.nodes, self.node_values):
@@ -112,39 +113,30 @@ class AMR(object):
         for n in self.coref_nodes:
             _coref_nodes.add(n)
         for n in candidates[:]:
-            rels = [rel for rel in relations_to_node[n] if sentences_by_node[rel[1]] != sentences_by_node[n]]
+            if len(relations_to_node[n]) < 2: continue
+            rels = [rel for rel in relations_to_node[n] if sentences_by_node[rel[1]]!=sentences_by_node[n]]
             if len(rels) < 2: continue
             parent1 = rels[0][1]
-            if any(sentences_by_node[parent2] != sentences_by_node[parent1] for _, parent2 in rels):
+            if any(sentences_by_node[parent2]!=sentences_by_node[parent1] for _,parent2 in rels):
                 _coref_nodes.add(n)
         # coref edges
-        self.coref_edges = {n: [] for n in self.coref_nodes}
-        for i, s in enumerate(self.nodes):
+        for i,s in enumerate(self.nodes):
             for rel in self.relations[i]:
-                r, t, is_inverted = rel
-                if s in self.coref_nodes:
-                    if is_inverted:
-                        self.coref_edges[s].append((r, s, t))
-                    elif r in ['bridge-part', 'bridge-subset', 'coref-part', 'coref-subset']:
-                        self.coref_edges[s].append((r, s, t))
-                elif t in self.coref_nodes:
-                    if not is_inverted:
-                        self.coref_edges[t].append((r, s, t))
-                    elif r in ['bridge-part', 'bridge-subset', 'coref-part', 'coref-subset']:
-                        self.coref_edges[t].append((r, s, t))
-
+                r, t, _ = rel
+                if t in _coref_nodes:
+                    self.coref_edges.append((r, s, t))
+                elif s in _coref_nodes and r in ['coref']:
+                    self.coref_edges.append((r, s, t))
+                elif r in ['part','subset'] and sentences_by_node[s]!=sentences_by_node[t]:
+                    self.coref_edges.append((r, s, t))
         # named entities
         _named_entities = set()
         for i, s in enumerate(self.nodes):
             for rel in self.relations[i]:
                 r, t, inv = rel
                 if r == 'name':
-                    if inv:
-                        _named_entities.add(t)
-                    else:
-                        _named_entities.add(s)
-        self.named_entities = [n for n in _named_entities]
-        # import ipdb; ipdb.set_trace()
+                    _named_entities.add(s)
+        self.named_entities = [n for n in _named_entities]    
 
     def categorize_nodes_by_sentence(self):
 

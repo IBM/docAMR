@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+
 """
 This code is taken from https://github.com/snowblink14/smatch
 
@@ -49,11 +50,6 @@ DEBUG_LOG = sys.stderr
 # key: tuples of node mapping
 # value: the matching triple count
 match_triple_dict = {}
-
-PRONOUNS = ['i', 'we', 'you', 'he', 'she', 'it', 'they', 'all', 'another', 'any', 'anybody', 'anyone', 'anything',
-            'both', 'each', 'either', 'everybody', 'everyone', 'everything', 'few', 'many', 'most', 'neither', 'nobody',
-            'none', 'nothing', 'one', 'other', 'several', 'some', 'somebody', 'someone', 'something', 'such', 'that',
-            'these', 'this', 'those', 'whatever', 'whichever', 'whoever', 'whomever']
 
 
 class SMATCH_Alignment():
@@ -162,22 +158,18 @@ class SMATCH_Alignment():
                 else:
                     self.attr_align[(r, n, t)] = None
 
-    def gold_to_pred(self, node=None, rel=None):
+    def gold_to_pred(self, node):
         if node:
             x = self.node_align_inv[('instance', node, self.gold_concepts[node])]
             return [n for _, n, c in x]
-        if rel:
-            return self.edge_align_inv[rel]
 
-    def pred_to_gold(self, node=None, rel=None):
+    def pred_to_gold(self, node):
         if node:
             x = self.node_align[('instance', node, self.pred_concepts[node])]
             if not x:
                 return None
             _, node2, concept = x
             return node2
-        if rel:
-            return self.edge_align[rel]
 
     def iterate_errors(self):
         for rel in self.node_align:
@@ -1005,111 +997,79 @@ def get_amr_match(cur_amr1, cur_amr2, sent_num=1, justinstance=False, justattrib
         amr1.find_coref()
         amr2.find_coref()
         alignment = SMATCH_Alignment(best_mapping, pred_amr=amr1, gold_amr=amr2)
-
+        #for type,rel,rel2 in alignment.iterate_errors():
+        #     print(type,rel,rel2)
+        #     print()
         # named entities
         # bridging relations
         # other
         ne_scores = Scores()
         bridging_scores = Scores()
-        coref_entity_scores = Scores()
-        pronoun_scores = Scores()
-        implicit_role_scores = Scores()
-
+        other_scores = Scores()
         for n in amr2.coref_nodes:
-            # count gold
-            if alignment.gold_concepts[n] == 'coref-entity':
-                coref_entity_scores.increment(gold=1)
+            if n in amr2.named_entities:
+                ne_scores.increment(gold=1)
+            else:
+                other_scores.increment(gold=1)
             ns = alignment.gold_to_pred(node=n)
-            n2 = [x for x in ns if x in amr1.coref_nodes]
-            for rel in amr2.coref_edges[n]:
-                r, s, t = rel
-                # if is_inverted:
-                #     s, t = t, s
-                # bridging relation
-                if r in ['bridge-part', 'bridge-subset', 'coref-part', 'coref-subset']:
-                    bridging_scores.increment(gold=1)
-                # named entity
-                elif n in amr1.named_entities:
-                    ne_scores.increment(gold=1)
-                # pronoun
-                elif alignment.gold_concepts[n] in PRONOUNS or (
-                        r != 'mention' and alignment.gold_concepts[n] == 'coref-entity'):
-                    pronoun_scores.increment(gold=1)
-                # coref entity
-                elif alignment.gold_concepts[n] == 'coref-entity':
-                    coref_entity_scores.increment(gold=1)
-                # implicit role
-                elif r.endswith('-implicit'):
-                    implicit_role_scores.increment(gold=1)
-
-                # count matches
-                if n2:
-                    if any(alignment.pred_concepts[x] == 'coref-entity' for x in n2):
-                        coref_entity_scores.increment(num=1)
-                    rs = alignment.gold_to_pred(rel=(r, s, t))
-                    for r2, s2, t2 in rs:
-                        if alignment.gold_to_pred(node=s) == s2 \
-                                and alignment.gold_to_pred(node=t) == t2 \
-                                and r == r2:
-                            # bridging relation
-                            if r in ['bridge-part', 'bridge-subset', 'coref-part', 'coref-subset']:
-                                bridging_scores.increment(num=1)
-                            # named entity
-                            elif n in amr1.named_entities:
-                                ne_scores.increment(num=1)
-                            # pronoun
-                            elif alignment.gold_concepts[n] in PRONOUNS or (
-                                    r != 'mention' and alignment.gold_concepts[n] == 'coref-entity'):
-                                pronoun_scores.increment(num=1)
-                            # coref entity
-                            elif alignment.gold_concepts[n] == 'coref-entity':
-                                coref_entity_scores.increment(num=1)
-                            # implicit role
-                            elif r.endswith('-implicit'):
-                                implicit_role_scores.increment(num=1)
-
+            for n2 in ns:
+                if n2 not in amr1.coref_nodes:
+                    continue
+                #if n in amr2.named_entities:
+                #    ne_scores.increment(pred=1)
+                #else:
+                #    other_scores.increment(pred=1)
+                if alignment.gold_concepts[n]==alignment.pred_concepts[n2]:
+                    if n in amr2.named_entities:
+                        ne_scores.increment(num=1)
+                    else:
+                        other_scores.increment(num=1)
         for n in amr1.coref_nodes:
-            # count pred
-            if alignment.pred_concepts[n] == 'coref-entity':
-                coref_entity_scores.increment(pred=1)
-            for rel in amr1.coref_edges[n]:
-                r, s, t = rel
-                # bridging relation
-                if r in ['bridge-part', 'bridge-subset', 'coref-part', 'coref-subset']:
-                    bridging_scores.increment(pred=1)
-                # named entity
-                elif n in amr1.named_entities:
-                    ne_scores.increment(pred=1)
-                # pronoun
-                elif alignment.gold_concepts[n] in PRONOUNS or (
-                        r != 'mention' and alignment.gold_concepts[n] == 'coref-entity'):
-                    pronoun_scores.increment(pred=1)
-                # coref entity
-                elif alignment.gold_concepts[n] == 'coref-entity':
-                    coref_entity_scores.increment(pred=1)
-                # implicit role
-                elif r.endswith('-implicit'):
-                    implicit_role_scores.increment(pred=1)
-
+            if n in amr1.named_entities:
+                ne_scores.increment(pred=1)
+            else:
+                other_scores.increment(pred=1)
+                
+        #ne_scores = Scores()
+        #bridging_scores = Scores()
+        #other_scores = Scores()                
+        for r,s,t in amr2.coref_edges:
+            if r in ['part','subset']:
+                bridging_scores.increment(gold=1)
+            else:
+                other_scores.increment(gold=1)
+            rels = alignment.edge_align_inv[(r,s,t)]
+            for rel in rels:
+                if rel not in amr1.coref_edges:
+                    continue
+                #if r in ['part', 'subset']:
+                #    bridging_scores.increment(pred=1)
+                #else:
+                #    other_scores.increment(pred=1)
+                r2, s2, t2 = rel
+                if r == r2:
+                    if r in ['part', 'subset']:
+                        bridging_scores.increment(num=1)
+                    else:
+                        other_scores.increment(num=1)
+        for r,s,t in amr1.coref_edges:
+            if r in ['part','subset']:
+                bridging_scores.increment(pred=1)
+            else:
+                other_scores.increment(pred=1)
+                
         subscores['Named Entity Coref'] = ne_scores
         subscores['Bridging Relations'] = bridging_scores
-
-        other_scores = Scores()
-        for scores in [coref_entity_scores, implicit_role_scores, pronoun_scores]:
-            other_scores.update(scores)
         subscores['Other Coref'] = other_scores
-
         coref_scores = Scores()
-        for scores in [ne_scores, bridging_scores, coref_entity_scores, implicit_role_scores, pronoun_scores]:
+        for scores in [ne_scores, bridging_scores, other_scores]:
             coref_scores.update(scores)
         subscores['Total Coref'] = coref_scores
-
         noncoref_scores = Scores()
-        noncoref_scores.set(num=best_match_num - coref_scores.num,
-                            gold=gold_triple_num - coref_scores.gold_total,
-                            pred=test_triple_num - coref_scores.pred_total)
+        noncoref_scores.set(num=best_match_num-coref_scores.num,
+                            gold=gold_triple_num-coref_scores.gold_total,
+                            pred=test_triple_num-coref_scores.pred_total)
         subscores['Non-Coref'] = noncoref_scores
-
     return total_nums, subscores
 
 # long_sents = []#2, 19, 35, 40, 41]
@@ -1152,8 +1112,9 @@ def score_amr_pairs(f1, f2, justinstance=False, justattribute=False, justrelatio
     todo = []
     todo.append(('Overall Score:', total_scores))
     if coref:
-        print("Coref Score coming soon!!")
-        #todo.append(('Coref Score', subscores['Total Coref'])) 
+        todo.append(('Coref Score', subscores['Total Coref'])) 
+        #for label in subscores:
+        #    todo.append((label, subscores[label]))
 
     for label, scores in todo:
         print(label)
