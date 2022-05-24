@@ -58,4 +58,13 @@ python docSmatch/smatch.py -f <amr1> <amr2>
 
 It assumes that ```:snt``` relations connect sentences to the root. Moreover, it assumes that the numeric suffix of ```:snt``` is the sentence number and that the matching sentence numbers in the two AMRs are aligned.
 
-Coref-subscore coming soon ....
+You can also get a detailed score breakdown for the accuracy of coreference prediction:
+```
+python docSmatch/smatch.py -f <amr1> <amr2> --coref-subscore
+```
+This will ouput the normal smatch score, as well as:
+- Total Coref : Smatch score for prediction of coreference
+- Named Entity Coref : Smatch score for coreference of named entities
+- Bridging Relations : Smatch score for prediction of bridging relations between coref clusters
+- Other Coref : Smatch score for other types of coreference including pronouns and common nouns
+- Non-Coref : Smatch score while ignoring coreference
