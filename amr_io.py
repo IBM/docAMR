@@ -119,7 +119,7 @@ def process_corefs(fnames):
             rel = "SELF"
             if 'variable' not in root[1][1][i][0].attrib.keys():
                 var = root[1][1][i][0].attrib['parentvariable']
-                rel = root[1][1][i][0].attrib['argument']
+                rel = ":"+root[1][1][i][0].attrib['argument']
             else:
                 var = root[1][1][i][0].attrib['variable']
             document_sngltns[singleton_id] = (sen_id +"." + var, rel)
