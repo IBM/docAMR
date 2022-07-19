@@ -9,6 +9,8 @@ pip install -r requirements.txt
 
 # Create docAMR representation
 
+Link to NAACL 2022 paper https://aclanthology.org/2022.naacl-main.256.pdf
+
 <img src="docAMR.jpg" width=60% height=60%>
 
 To create docAMR representation from gold AMR3.0 data and the coref annotation in xml format:
