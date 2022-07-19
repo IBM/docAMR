@@ -16,7 +16,7 @@ pip install -r doc_amr_baseline/requirements.txt
 To get a document amr , given the sentence amrs run
 
 ```bash
-bash run_doc_amr_baseline.sh <path_to_tokenized_sentence_amrs> <path_to_out> <normalization_representation> <path_to_coref-optional>
+bash doc_amr_baseline/run_doc_amr_baseline.sh <path_to_tokenized_sentence_amrs> <path_to_out> <normalization_representation> <path_to_coref-optional>
 
 ```
 <path_to_tokenized_sentence_amrs> is a folder containing a file of sentence amrs for each document . Each file in the folder should have extension '.amr' and contain sentence amrs for all sentences in the document seperated by a newline. See **Format of AMR files** for further details.
