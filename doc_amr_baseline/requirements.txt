@@ -1,0 +1,5 @@
+allennlp==2.10.0
+allennlp-models==2.10.0
+ipdb==0.13.9
+penman==1.2.1
+tqdm==4.64.0
