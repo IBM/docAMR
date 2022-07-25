@@ -9,7 +9,9 @@ pip install -r requirements.txt
 
 # Create docAMR representation
 
-Link to NAACL 2022 paper https://aclanthology.org/2022.naacl-main.256.pdf
+Link to NAACL 2022 paper DOCAMR: Multi-Sentence AMR Representation and Evaluation
+
+https://aclanthology.org/2022.naacl-main.256.pdf
 
 <img src="docAMR.jpg" width=60% height=60%>
 
