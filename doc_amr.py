@@ -36,6 +36,9 @@ def make_doc_amrs(corefs, amrs, coref=True,chains=True):
             else:
                 doc_amr.add_edges(doc_corefs)
         
+        #setting penman to None to avoid copying sentence amr's penman
+        doc_amr.penman = None
+        
         doc_amrs[doc_id] = doc_amr
 
     return doc_amrs
