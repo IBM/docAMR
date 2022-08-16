@@ -372,7 +372,7 @@ class AMR():
         mergeable_kids = []
         for (i,e) in enumerate(self.edges):
             if e[2] == node2:
-                if e[0] == node1 :
+                if e[0] == node1 or e[0] == node2:
                     edges_to_delete.append(e)
                     continue
                 new_edge = (e[0], e[1], node1)
@@ -381,7 +381,7 @@ class AMR():
                 else:
                     edges_to_delete.append(e)
             if e[0] == node2:
-                if e[2] == node1 :
+                if e[2] == node1 or e[2] == node2:
                     edges_to_delete.append(e)
                     continue
                 if e[1] not in [":name",":wiki"]:
@@ -408,7 +408,9 @@ class AMR():
                             if y == e[2] and x != e[0]:
                                 has_other_parents = True
                         if not has_other_parents:
-                            self.delete_name(e[2])
+                            left_overs = self.delete_name(e[2])
+                            for (r,n) in left_overs:
+                                self.edges.append((node1, r, n))
                         edges_to_delete.append(e)
                 else:
                     new_node_wiki = self.nodes[e[2]]
@@ -590,7 +592,7 @@ class AMR():
                                 print("type selected based on NE types " + ntype)
                             break
                     if not found_amr_type:
-                        freq_type = sorted(Counter(name_types).items(), key=lambda tup: tup[1], reverse=True)[0]
+                        freq_type = sorted(Counter(name_types).items(), key=lambda tup: tup[1], reverse=True)[0][0]
                         idx = name_types.index(freq_type)
                         names_head = named_nodes[idx]
                         if AMR.verbose:
@@ -702,7 +704,7 @@ class AMR():
                     print("Chain Head (" + chain_head + "): " + self.nodes[chain_head])
                 else:
                     #this case is taken care of later when singlen node  chains are dropped
-                    print("Chain Head (" + chain_othrs[0] + "): " + " ".join(othr_forms))
+                    print("Chain Head (" + str(chain_othrs[0]) + "): " + " ".join(othr_forms))
                 print("--------------------------")
             
             for pid in chain_prons:
@@ -816,17 +818,23 @@ class AMR():
             print("can not delete, does not exist")
             return
         if self.nodes[name_node_id] != 'name':
-            print("not a name node, delteing anyways")
+            print("not a name node, deleteing anyways")
         edges_to_delete = []
+        left_overs = []
         for e in self.edges:
             if e[0] == name_node_id:
-                if e[2] in self.nodes:
-                    del self.nodes[e[2]]
+                if 'op' in e[1]:
+                    if e[2] in self.nodes:
+                        del self.nodes[e[2]]
+                else:
+                    left_overs.append((e[1],e[2]))
                 edges_to_delete.append(e)
         del self.nodes[name_node_id]
         for e in edges_to_delete:
             if e in self.edges:
                 self.edges.remove(e)
+
+        return left_overs
 
     def delete_sub(self, name_node_id):
         if name_node_id not in self.nodes:
