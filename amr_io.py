@@ -218,7 +218,8 @@ class AMR():
                 if self.sid and self.nvars:
                     new_nvars[new_nid] = self.sid+"."+self.nvars[nid] if self.nvars[nid] is not None else None
                 if self.alignments:
-                    new_alignments[new_nid] = self.alignments[nid]
+                    if nid in self.alignments:
+                        new_alignments[new_nid] = self.alignments[nid]
             for (n1,l,n2) in self.edges:
                 new_edges.append(("s1."+str(n1), l, "s1."+str(n2)))
             
@@ -371,6 +372,8 @@ class AMR():
         edges_to_delete = []
         mergeable_kids = []
         for (i,e) in enumerate(self.edges):
+            if e in edges_to_delete:
+                continue
             if e[2] == node2:
                 if e[0] == node1 or e[0] == node2:
                     edges_to_delete.append(e)
@@ -405,8 +408,11 @@ class AMR():
                     else:
                         has_other_parents = False
                         for (x,r,y) in self.edges:
-                            if y == e[2] and x != e[0]:
-                                has_other_parents = True
+                            if y == e[2]:
+                                if x != e[0]:
+                                    has_other_parents = True
+                                elif r != e[1]:
+                                    edges_to_delete.append((x,r,y))
                         if not has_other_parents:
                             left_overs = self.delete_name(e[2])
                             for (r,n) in left_overs:
@@ -891,23 +897,46 @@ class AMR():
                 
         return cls(tokens, nodes, edges, graph.top, penman=graph, sid=sid, nvars=nvars)
 
+    def delete_node_leaving_no_trace(self, node_id):
 
+        edges2delete = []
+
+        for e in self.edges:
+            if node_id in e:
+                edges2delete.append(e)
+
+        for e in edges2delete:
+            if e in self.edges:
+                self.edges.remove(e)
+
+        del self.nodes[node_id]
+        
     def check_connectivity(self):
 
         descendents = {n: {n} for n in self.nodes}
+        edges2delete = []
         for x, r, y in self.edges:
             if x not in descendents or y not in descendents:
-                print((x, r, y))
-                import ipdb; ipdb.set_trace()
+                print("will delete "+str((x, r, y)))
+                edges2delete.append((x, r, y))
+                continue
             descendents[x].update(descendents[y])
             for n in descendents:
                 if x in descendents[n]:
                     descendents[n].update(descendents[x])
 
-        #for nid in self.nodes:
-        #    if nid not in descendents[self.root]:
-        #        print(self.nodes[nid])
-        #        print("Nope, not connected")
+        for e in edges2delete:
+            if e in self.edges:
+                self.edges.remove(e)
+
+        to_be_deleted = []
+        for nid in self.nodes:
+            if len( descendents[nid] &  descendents[self.root] ) == 0 :
+                print(self.nodes[nid])
+                print("Nope, not connected, will be deleted")
+                to_be_deleted.append(nid)
+        for nid in to_be_deleted:
+            self.delete_node_leaving_no_trace(nid)
 
         for e in self.edges:
             if e[0] not in self.nodes or e[2] not in self.nodes:
@@ -942,8 +971,8 @@ class AMR():
     
     def __str__(self):
 
-        self.make_penman()
         self.check_connectivity()
+        self.make_penman()
         meta_data = ""
         if self.amr_id:
             meta_data  = '# ::id ' + self.amr_id + '\n'
@@ -1070,7 +1099,10 @@ class AMR():
             for e in self.edges:
                 if e[1] == coref_rel or e[1] == coref_rel+"-of":
                     found = True
-                    self.merge_nodes_into_chain(e[0],e[2])
+                    if type(e[0]) == int or type(e[2]) == int:
+                        self.edges.remove(e)
+                    else:
+                        self.merge_nodes_into_chain(e[0],e[2])
                     break
 
         self.move_bridges_to_chains()
