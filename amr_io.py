@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 from tqdm import tqdm
 import penman
 from penman.layout import Push
+from penman import surface
 import copy
 from collections import Counter, defaultdict
 
@@ -40,9 +41,24 @@ def get_simple_graph(graph):
     Get simple nodes/edges representation from penman class
     """
 
-    # get map of node variables to node names (this excludes constants)
-    name_to_node = {x.source: x.target for x in graph.instances()}
+    # alignments
+    isi_alignments = surface.alignments(graph)
 
+    # get map of node variables to node names (this excludes constants)
+    name_to_node = {}
+    alignments = {}
+    for x in graph.instances():
+        name_to_node[x.source] = x.target
+        if x in isi_alignments:
+            if len(isi_alignments[x].indices) == 1:
+                alignments[x.source] = list(isi_alignments[x].indices)
+            elif len(isi_alignments[x].indices) == 2:
+                start = isi_alignments[x].indices[0]
+                end = isi_alignments[x].indices[-1]
+                alignments[x.source] = list(range(start, end))
+            else:
+                raise Exception('Unexpected ISI alignment format')
+    
     # Get all edges (excludes constants)
     edges = []
     for x in graph.edges():
@@ -62,6 +78,18 @@ def get_simple_graph(graph):
     for index, att in enumerate(graph.attributes()):
         assert index not in name_to_node
         name_to_node[index] = att.target
+
+        # add alignments
+        if att in isi_alignments:
+            if len(isi_alignments[att].indices) == 1:
+                alignments[index] = list(isi_alignments[att].indices)
+            elif len(isi_alignments[att].indices) == 2:
+                start = isi_alignments[att].indices[0]
+                end = isi_alignments[att].indices[-1]
+                alignments[index] = list(range(start, end))
+            else:
+                raise Exception('Unexpected ISI alignment format')
+        
         edge_epidata = graph.epidata[(att.source, att.role, att.target)]
         if (
             edge_epidata
@@ -75,7 +103,7 @@ def get_simple_graph(graph):
             edges.append((att.source, att.role, index))
 
     # print(penman.encode(graph))
-    return name_to_node, edges
+    return name_to_node, edges, alignments
 
 def process_corefs(fnames):
 
@@ -211,7 +239,6 @@ class AMR():
             new_nvars = {}
             new_edges = []
             new_alignments = {}
-            #import ipdb; ipdb.set_trace()
             for nid in self.nodes:
                 new_nid = "s1."+str(nid)
                 new_nodes[new_nid] = self.nodes[nid]
@@ -389,6 +416,9 @@ class AMR():
                     continue
                 if e[1] not in [":name",":wiki"]:
                     #see if the kid should be merged recursively
+                    if e[2] not in self.nodes:
+                        edges_to_delete.append(e)
+                        print("edge node does not exist !!!")
                     kid_form = (e[1],self.nodes[e[2]])
                     if kid_form in node1_kids and node1_kids[kid_form] != e[2]:
                         pair = (node1_kids[(e[1],self.nodes[e[2]])], e[2])
@@ -443,7 +473,7 @@ class AMR():
             self.nvars[node2] = None #ensure that this node will be treated as attribute
         else:
             if node2 not in self.nodes:
-                import ipdb; ipdb.set_trace()
+                print("node2 disppeared !!!")
             del self.nodes[node2]
 
         for e in edges_to_delete:
@@ -512,7 +542,7 @@ class AMR():
     def normalize(self, rep='docAMR', flip=False):
 
         #self.un_invert()
-        
+            
         if rep == 'no-merge':
             self.remove_one_node_chains()
             return
@@ -642,10 +672,8 @@ class AMR():
                 if kid[0] != kids2[j][0]:
                     if kids2[j][0] not in self.nodes:
                         print("cant merge, node does not exist")
-                        import ipdb; ipdb.set_trace()
                     else:
                         self.merge_sub(kid[0],kids2[j][0])
-                        import ipdb; ipdb.set_trace()
                 
         self.merge_nodes(node1, node2)
             
@@ -874,7 +902,7 @@ class AMR():
         Read AMR from penman notation (will ignore graph data in metadata)
         """
         graph = penman.decode(penman_text)
-        nodes, edges = get_simple_graph(graph)
+        nodes, edges, alns = get_simple_graph(graph)
         tokens = ""
         sid = None
         if 'id' in graph.metadata:
@@ -895,12 +923,12 @@ class AMR():
             if isinstance(nvar, str):
                 nvars[nvar] = nvar
                 
-        return cls(tokens, nodes, edges, graph.top, penman=graph, sid=sid, nvars=nvars)
+        return cls(tokens, nodes, edges, graph.top, penman=graph, sid=sid, nvars=nvars, alignments=alns)
 
     def delete_node_leaving_no_trace(self, node_id):
 
         edges2delete = []
-
+        
         for e in self.edges:
             if node_id in e:
                 edges2delete.append(e)
@@ -924,7 +952,7 @@ class AMR():
             for n in descendents:
                 if x in descendents[n]:
                     descendents[n].update(descendents[x])
-
+                    
         for e in edges2delete:
             if e in self.edges:
                 self.edges.remove(e)
@@ -951,12 +979,16 @@ class AMR():
         for e in self.edges:
             if e[0] == self.root:
                 all_tuples.append(e)
-        
+
+        epidata = {}
+                
         for nid in self.nodes:
             if self.nvars[nid] is not None:
                 tup = (nid,":instance",self.nodes[nid])
                 if tup not in all_tuples:
                     all_tuples.append(tup)
+                    if nid in self.alignments:
+                        epidata[tup] = [surface.Alignment(indices=self.alignments[nid])]
                     
         for e in self.edges:
             if self.nvars[e[2]] is None:
@@ -964,10 +996,12 @@ class AMR():
                 tup = (e[0],e[1],self.nodes[e[2]])
                 if tup not in all_tuples:
                     all_tuples.append(tup)
+                    if e[2] in self.alignments:
+                        epidata[tup] = [surface.Alignment(indices=self.alignments[e[2]])]
             else:
                 if e not in all_tuples:
                     all_tuples.append(e)
-        self.penman = penman.graph.Graph(all_tuples)
+        self.penman = penman.graph.Graph(triples=all_tuples, epidata=epidata)
     
     def __str__(self):
 
@@ -1032,10 +1066,10 @@ class AMR():
     def merge_nodes_into_chain(self, node1, node2):
         
         if node1 not in self.nodes:
-            import ipdb; ipdb.set_trace()
+            print("cannot merge, node1 not found !!!")
             return
         if node2 not in self.nodes:
-            import ipdb; ipdb.set_trace()
+            print("cannot merge, node2 not found !!!")
             return
 
         node_corefs = self.get_nodes_chains()
@@ -1079,7 +1113,7 @@ class AMR():
                             else:
                                 edges_to_delete.append(e)
                 else:
-                    import ipdb; ipdb.set_trace()
+                    print("node2 coref not found !!!")
         elif node2_corf is not None:
             coref_edge = (node1, AMR.coref_rel_inv, node2_corf)
             self.edges.append(coref_edge)
@@ -1129,7 +1163,6 @@ class AMR():
                     if edge not in self.edges:
                         self.edges.append(edge)
             else:
-                #import ipdb; ipdb.set_trace()
                 print("node varaiables not found for the edge: " + s + "\t" + t)
 
 def process_corefs_into_triples(fnames):
@@ -1204,8 +1237,6 @@ def process_corefs_into_triples(fnames):
                 if len(parent) == 0 :
                     print("missing parent")
                     break
-                if kid_rel == 'superset':
-                    import ipdb; ipdb.set_trace()
                 document_triples.append((kid, kid_rel, parent))
 
         corefs[doc_id] = (document_triples,doc_sen_ids,fname)
