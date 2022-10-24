@@ -1,6 +1,7 @@
 from collections import defaultdict
 from ipdb import set_trace
 import re
+import copy
 
 
 def get_subgraph_by_id(amr, no_reentrancies=True, no_reverse_edges=False):
@@ -72,7 +73,7 @@ def get_constituents_from_subgraph(amr):
     def get_constituent(nid):
         '''Given nid and subgraph extract span aligned to it'''
         # Token aligned to node
-        indices = amr.alignments[nid]
+        indices = copy.deepcopy(amr.alignments[nid])
         sids = subgraph_by_id[nid]
         if sids is not None:
             # Tokens aligned to all nodes below it
