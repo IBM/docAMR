@@ -81,20 +81,23 @@ def construct_triples(doc_amrs,from_sen_id,from_node_id,sen_node_pairs,relation,
     return triples    
 
 
-def process_coref_conll(amrs,coref_chains,add_coref=True,verbose=False,save_triples=False,out=None,relation='same-as'):
+def process_coref_conll(amrs,coref_chains,add_coref=True,verbose=False,save_triples=False,out=None,relation='same-as',coref_type='allennlp'):
     corefs = {}
     for doc_id,doc_amrs in tqdm.tqdm(amrs.items()):
         doc_triples = []
         doc_sids = list(doc_amrs.keys())
         sid_done =[]
-        if add_coref:
+        if add_coref and doc_id in coref_chains:
             #getting subgraph information of each amr
             subgraphs = {f_id: get_constituents_from_subgraph(doc_amrs[f_id]) for f_id in doc_amrs if doc_amrs[f_id].root is not None and len(doc_amrs[f_id].alignments)>0 }
             for ent in coref_chains[doc_id]:
                 min_id = (None,None)
                 sen_node_pairs = []
                 for mention in ent:
-                    sid = mention[0]+1
+                    if coref_type=='conll':
+                        sid = mention[0]
+                    elif coref_type=='allennlp':
+                        sid = mention[0]+1
                     beg = mention[1]
                     end = mention[2]
                     sen_id = doc_id+'.'+str(sid)
@@ -145,6 +148,7 @@ if __name__ == "__main__":
     parser.add_argument('--add_id',action='store_true',help='add id to amr')
     parser.add_argument('--add_coref',action='store_true',default=False,help='add coref to doc amr')
     parser.add_argument('--allennlp',action='store_true',help='coref format pickled coref chains allen_nlp')
+    parser.add_argument('--conll',action='store_true',help='coref format is conll')
     parser.add_argument('--event',action='store_true',help='perform event coref')
     parser.add_argument('--norm_rep',type=str,default='docAMR',help='''normalization format 
         "no-merge" -- No node merging, only chain-nodes
@@ -218,15 +222,28 @@ if __name__ == "__main__":
         amrs_dict.update(amrs[doc_id])
     
     
-   
-    #Getting coref from allen-nlp Spanbert model
-    coref_chains = {}
-    out = pickle.load(open(args.path_to_coref,'rb'))
-    for i,(doc_id,val) in enumerate(out.items()):
+    if args.allennlp:
+        #Getting coref from allen-nlp Spanbert model
+        coref_chains = {}
+        out = pickle.load(open(args.path_to_coref,'rb'))
+        for i,(doc_id,val) in enumerate(out.items()):
 
-        coref_chains[doc_id] = val
-    assert len(coref_chains)>0,"Coref file is empty"
-    corefs = process_coref_conll(amrs,coref_chains,args.add_coref,verbose=args.verbose,save_triples=args.save_triples)
+            coref_chains[doc_id] = val
+        assert len(coref_chains)>0,"Coref file is empty"
+        corefs = process_coref_conll(amrs,coref_chains,args.add_coref,verbose=args.verbose,save_triples=args.save_triples,coref_type='allennlp')
+    elif args.conll:
+        from corefconversion.conll_transform import read_file as conll_read_file
+        from corefconversion.conll_transform import compute_chains as conll_compute_chains
+
+        coref_chains = {}
+        out = conll_read_file(args.path_to_coref)
+        for n,(i,val) in enumerate(out.items()):
+            
+            docid_spl = i.split('); part ')
+            doc_id = docid_spl[0].split('/')[-1]+'_'+str(int(docid_spl[1]))
+            coref_chains[doc_id] = conll_compute_chains(val)
+            assert len(coref_chains)>0,"Coref file is empty"
+        corefs = process_coref_conll(amrs,coref_chains,save_triples=args.save_triples,out=args.out_amr,coref_type='conll')
         
 
 
@@ -250,7 +267,8 @@ if __name__ == "__main__":
 
     #with open(args.out_amr+'/'+doc_id+'_docamr_'+args.norm_rep+'.out', 'w') as fid:
     with open(args.out_amr+'/'+args.path_to_amr.split('/')[-1]+'docamr_'+args.norm_rep+'.out', 'w') as fid:
-        for doc_id,amr in out_doc_amrs.items():
+        
+        for doc_id,amr in tqdm(out_doc_amrs.items(),'writing doc-amrs'):
             
                 damr = copy.deepcopy(amr)
                 connect_sen_amrs(damr)
