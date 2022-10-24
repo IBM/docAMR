@@ -12,7 +12,10 @@ Packages to install are in requirements.txt. Python 3.7 works best. To install t
 ```bash
 pip install -r doc_amr_baseline/requirements.txt
 ```
-
+Clone a dependent repository for conll coref conversion
+```bash
+git clone https://github.com/boberle/corefconversion.git
+```
 To get a document amr , given the sentence amrs run
 
 ```bash
