@@ -7,6 +7,15 @@ from penman import surface
 import copy
 from collections import Counter, defaultdict
 
+def normalize_tok(token):
+    """
+    Normalize token or node
+    """
+    if token == '"':
+        return token
+    else:
+        return token.replace('"', '')
+
 def simple_tokenizer(string):
     ret_str = re.sub(r'([a-zA-Z])(\'[a-zA-Z])',r'\1 \2',string)
     ret_str = re.sub(r'([\.,;:?!"\(\)\[\]\{\}])',r' \1 ',ret_str)
@@ -38,7 +47,7 @@ def read_amr(file_path, tokenize=False):
 
 def get_simple_graph(graph):
     """
-    Get simple nodes/edges representation from penman class
+    Get simple nodes/edges/alignments representation from penman class
     """
 
     # alignments
@@ -58,38 +67,96 @@ def get_simple_graph(graph):
                 alignments[x.source] = list(range(start, end))
             else:
                 raise Exception('Unexpected ISI alignment format')
-    
+
+    # reentrancy
+    reentrancies = [e for e, c in graph.reentrancies().items() if c > 1]
+
     # Get all edges (excludes constants)
     edges = []
+    re_entrant = defaultdict(list)
     for x in graph.edges():
         assert x.target in name_to_node
+
+        # get epidata
         edge_epidata = graph.epidata[(x.source, x.role, x.target)]
+
+        # keep inverted edges
         if (
             edge_epidata
             and isinstance(edge_epidata[0], Push)
             and edge_epidata[0].variable == x.source
         ):
             # reversed edge
-            edges.append((x.target, f'{x.role}-of', x.source))
+            edge = (x.target, f'{x.role}-of', x.source)
         else:
-            edges.append((x.source, x.role, x.target))
+            edge = (x.source, x.role, x.target)
+
+        # delay adding an edge if its reentrant until we produce the original
+        # edge
+        # TODO: Does not work fully, remove?
+        if (
+            edge[-1] in reentrancies
+            and edge_epidata
+            and isinstance(edge_epidata[0], Push)
+            and edge_epidata[0].variable == edge[-1]
+            and re_entrant[edge[-1]] is not None
+        ):
+            # this is the original edge from a re-entrant series
+            # append edge and all the re-entrancies
+            edges.append(edge)
+            edges.extend(re_entrant[edge[-1]])
+            # block, since we do not need it any more
+            re_entrant[edge[-1]] = None
+
+        elif (
+            edge[-1] in reentrancies
+            and re_entrant[edge[-1]] is not None
+        ):
+            # append also edges rentrant to these
+            re_entrant[edge[-1]].append(edge)
+
+        else:
+            # append edge
+            edges.append(edge)
+
+    # if nodes are re-entran to root, we will reach here with pending edges
+    for nid, rest in re_entrant.items():
+        if rest is not None:
+            edges.extend(rest)
+
+    if len(edges) < len(graph.edges()):
+        set_trace(context=30)
 
     # Add constants both to node map and edges, use position in attribute as id
-    for index, att in enumerate(graph.attributes()):
+    # sort attributes by target for consistency in assignment
+    attributes = sorted(
+        graph.attributes(),
+        key=lambda x: (
+            x.source, x.role, x.target.replace('"', '')
+        )
+    )
+    index = 0
+    attribute_nodes = []
+    for att in attributes:
         assert index not in name_to_node
-        name_to_node[index] = att.target
-
+        # will be used as a node id, needs to be a string
+        # watch for existing numbers used as ids
+        while str(index) in name_to_node:
+            index += 1
+        att_id = str(index)
+        name_to_node[att_id] = att.target
+        attribute_nodes.append(att_id)
         # add alignments
         if att in isi_alignments:
             if len(isi_alignments[att].indices) == 1:
-                alignments[index] = list(isi_alignments[att].indices)
+                alignments[att_id] = list(isi_alignments[att].indices)
             elif len(isi_alignments[att].indices) == 2:
                 start = isi_alignments[att].indices[0]
                 end = isi_alignments[att].indices[-1]
-                alignments[index] = list(range(start, end))
+                alignments[att_id] = list(range(start, end))
             else:
                 raise Exception('Unexpected ISI alignment format')
-        
+
         edge_epidata = graph.epidata[(att.source, att.role, att.target)]
         if (
             edge_epidata
@@ -98,12 +165,14 @@ def get_simple_graph(graph):
         ):
             # reversed edge
             raise Exception()
-            edges.append((index, f'{att.role}-of', att.source))
+            edges.append((att_id, f'{att.role}-of', att.source))
         else:
-            edges.append((att.source, att.role, index))
+            edges.append((att.source, att.role, att_id))
 
-    # print(penman.encode(graph))
-    return name_to_node, edges, alignments
+        # increase index
+        index += 1
+
+    return name_to_node, edges, alignments, attribute_nodes
 
 def process_corefs(fnames):
 
@@ -201,7 +270,7 @@ class AMR():
     verbose = True
     
     def __init__(self, tokens, nodes, edges, root, penman=None,
-                 alignments=None, sid = None, nvars = None):
+                 alignments=None, sid = None, nvars = None, sentence_ends=None):
 
         if sid is None:
             sid = str(AMR.id_counter)
@@ -216,10 +285,16 @@ class AMR():
         self.penman = penman
         self.alignments = alignments
 
+        self.sentence_ends = sentence_ends
+
         # root
         self.root = root
         self.roots = []
-
+        if self.nodes[self.root] == 'document':
+            for (s,rel,t) in self.edges:
+                if s == self.root and rel.startswith(':snt'):
+                    self.roots.append(t)
+                    
         # xml file name, for doc-amr
         self.doc_file = None
         self.amr_id = sid
@@ -239,6 +314,7 @@ class AMR():
             new_nvars = {}
             new_edges = []
             new_alignments = {}
+            
             for nid in self.nodes:
                 new_nid = "s1."+str(nid)
                 new_nodes[new_nid] = self.nodes[nid]
@@ -418,7 +494,7 @@ class AMR():
                     #see if the kid should be merged recursively
                     if e[2] not in self.nodes:
                         edges_to_delete.append(e)
-                        print("edge node does not exist !!!")
+                        print("edge node does not exist !!!")                    
                     kid_form = (e[1],self.nodes[e[2]])
                     if kid_form in node1_kids and node1_kids[kid_form] != e[2]:
                         pair = (node1_kids[(e[1],self.nodes[e[2]])], e[2])
@@ -446,7 +522,7 @@ class AMR():
                         if not has_other_parents:
                             left_overs = self.delete_name(e[2])
                             for (r,n) in left_overs:
-                                self.edges.append((node1, r, n))
+                                self.edges.append((node1, r, n))                            
                         edges_to_delete.append(e)
                 else:
                     new_node_wiki = self.nodes[e[2]]
@@ -470,10 +546,10 @@ class AMR():
                                         
         if additional and self.nodes[node2] not in node1_forms:
             self.edges.append((node1,":additional-type",node2))
-            self.nvars[node2] = None #ensure that this node will be treated as attribute
+            #self.nvars[node2] = None #ensure that this node will be treated as attribute
         else:
             if node2 not in self.nodes:
-                print("node2 disppeared !!!")
+                print("node2 disappeared !!!")
             del self.nodes[node2]
 
         for e in edges_to_delete:
@@ -501,7 +577,7 @@ class AMR():
                 edge = (node,rel,chain_nid)
                 if edge not in self.edges:
                     self.edges.append(edge)
-
+                    
         singletons2nodes = {}
         for sg_id in singletons:
             singleton = singletons[sg_id]
@@ -542,7 +618,7 @@ class AMR():
     def normalize(self, rep='docAMR', flip=False):
 
         #self.un_invert()
-            
+        
         if rep == 'no-merge':
             self.remove_one_node_chains()
             return
@@ -628,7 +704,7 @@ class AMR():
                                 print("type selected based on NE types " + ntype)
                             break
                     if not found_amr_type:
-                        freq_type = sorted(Counter(name_types).items(), key=lambda tup: tup[1], reverse=True)[0][0]
+                        freq_type = sorted(Counter(name_types).items(), key=lambda tup: tup[1], reverse=True)[0]
                         idx = name_types.index(freq_type)
                         names_head = named_nodes[idx]
                         if AMR.verbose:
@@ -901,8 +977,12 @@ class AMR():
         """
         Read AMR from penman notation (will ignore graph data in metadata)
         """
+
+        #assert isinstance(penman_text, str), "Expected string with EOL"
+        #assert '\n' in penman_text, "Expected string with EOL"
+        
         graph = penman.decode(penman_text)
-        nodes, edges, alns = get_simple_graph(graph)
+        nodes, edges, alignments, attributes = get_simple_graph(graph)
         tokens = ""
         sid = None
         if 'id' in graph.metadata:
@@ -916,14 +996,33 @@ class AMR():
             else:
                 tokens = [graph.metadata['snt']]
 
+        # wipe out JAMR notation from metadata since it can become inconsistent
+        # also remove unsupported "alignments" field
+        delete_keys = []
+        for key, data in graph.metadata.items():
+            for okey in ['node', 'edge', 'root', 'short', 'alignments']:
+                if key.startswith(okey):
+                    delete_keys.append(key)
+        for key in delete_keys:
+            del graph.metadata[key]
+
+        # remove quotes
+        nodes = {nid: normalize_tok(nname) for nid, nname in nodes.items()}
+                
         #node variables
         #values and literals dont get node variables
         nvars = dict.fromkeys(nodes, None)
         for nvar in nvars:
-            if isinstance(nvar, str):
+            if isinstance(nvar, str) and nvar not in attributes:
                 nvars[nvar] = nvar
+
+        if 'sentence_ends' in graph.metadata:
+            sentence_ends = graph.metadata['sentence_ends'].split()
+            sentence_ends = [int(x) for x in sentence_ends]
+        else:
+            sentence_ends = []
                 
-        return cls(tokens, nodes, edges, graph.top, penman=graph, sid=sid, nvars=nvars, alignments=alns)
+        return cls(tokens, nodes, edges, graph.top, penman=graph, sid=sid, nvars=nvars, sentence_ends=sentence_ends)
 
     def delete_node_leaving_no_trace(self, node_id):
 
@@ -938,7 +1037,7 @@ class AMR():
                 self.edges.remove(e)
 
         del self.nodes[node_id]
-        
+
     def check_connectivity(self):
 
         descendents = {n: {n} for n in self.nodes}
@@ -970,50 +1069,67 @@ class AMR():
             if e[0] not in self.nodes or e[2] not in self.nodes:
                 print(e)
                 print("Bad edge")
-                
+
     def make_penman(self):
+
+        self.un_invert() #normalizes all edges except for :coref-of
         
         all_tuples = []
+        epidata = {}
 
         #add root edges first, thats how penman decides on 'top'
         for e in self.edges:
             if e[0] == self.root:
                 all_tuples.append(e)
-
-        epidata = {}
-                
+        
         for nid in self.nodes:
-            if self.nvars[nid] is not None:
+            if nid in self.nvars and self.nvars[nid] is not None:
                 tup = (nid,":instance",self.nodes[nid])
                 if tup not in all_tuples:
                     all_tuples.append(tup)
-                    if nid in self.alignments:
-                        epidata[tup] = [surface.Alignment(indices=self.alignments[nid])]
-                    
+                    if self.alignments and nid in self.alignments and self.alignments[nid] is not None:
+                        epidata[tup] = [surface.Alignment(indices=self.alignments[nid] if len(self.alignments[nid])<3 else [self.alignments[nid][0],self.alignments[nid][-1]])]
+                        
         for e in self.edges:
+            if self.nvars[e[0]] is None:
+                print("\n!!!!! bad edge, constant as parent ... will not be printed "+ str(e))
+                continue
             if self.nvars[e[2]] is None:
+                if self.nodes[e[0]] == 'coref-entity':
+                    print("\n!!!!! coref chains can not form over constants: "+ str(e))
+                    continue
                 #no node variable indicates constant valued attribute
-                tup = (e[0],e[1],self.nodes[e[2]])
+                #FIXME adding explicit quotes to attributes
+                tup = (e[0],e[1],f'"{self.nodes[e[2]]}"')
                 if tup not in all_tuples:
                     all_tuples.append(tup)
-                    if e[2] in self.alignments:
-                        epidata[tup] = [surface.Alignment(indices=self.alignments[e[2]])]
+                    if self.alignments and e[2] in self.alignments and self.alignments[e[2]] is not None:
+                        epidata[tup] = [surface.Alignment(indices=self.alignments[e[2]] if len(self.alignments[e[2]])<3 else [self.alignments[e[2]][0],self.alignments[e[2]][-1]])]
             else:
                 if e not in all_tuples:
                     all_tuples.append(e)
         self.penman = penman.graph.Graph(triples=all_tuples, epidata=epidata)
     
-    def __str__(self):
+    def __str__(self,jamr=False):
 
+        self.penman = None
         self.check_connectivity()
         self.make_penman()
+        self.penman_str = penman.encode(self.penman) # self.to_penman(jamr=jamr)
         meta_data = ""
         if self.amr_id:
             meta_data  = '# ::id ' + self.amr_id + '\n'
         if self.doc_file:
             meta_data += '# ::doc_file ' + self.doc_file + '\n'
+        if '::sentence_ends' not in meta_data and self.sentence_ends and len(self.sentence_ends)>0:
+            snt_ends_str = [str(x) for x in self.sentence_ends]
+            meta_data+= '# ::sentence_ends ' + ' '.join(snt_ends_str) + '\n'
+
         meta_data += '# ::tok ' + ' '.join(self.tokens) + '\n'
-        return meta_data + penman.encode(self.penman) + '\n\n'
+        #sanity check
+        #p = penman.decode(self.penman_str)
+
+        return meta_data + self.penman_str + '\n\n'
 
 
     #=====================================================================
@@ -1131,12 +1247,12 @@ class AMR():
         while found:
             found = False
             for e in self.edges:
-                if e[1] == coref_rel or e[1] == coref_rel+"-of":
+                if e[1] == ':'+coref_rel or e[1] == ':'+coref_rel+"-of":
                     found = True
                     if type(e[0]) == int or type(e[2]) == int:
                         self.edges.remove(e)
                     else:
-                        self.merge_nodes_into_chain(e[0],e[2])
+                        self.merge_nodes_into_chain(e[0],e[2])                    
                     break
 
         self.move_bridges_to_chains()
