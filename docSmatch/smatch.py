@@ -19,7 +19,7 @@ For detailed description of smatch, see http://www.isi.edu/natural-language/amr/
 
 import random
 
-import amr
+from . import amr
 import sys
 import time
 from tqdm import tqdm
@@ -1127,7 +1127,7 @@ def score_amr_pairs(f1, f2, justinstance=False, justattribute=False, justrelatio
             yield compute_f(total_match_num, total_test_num, total_gold_num)
 
 
-def main(arguments):
+def main():
     """
     Main function of smatch score calculation
     """
@@ -1137,40 +1137,7 @@ def main(arguments):
     global single_score
     global pr_flag
     global match_triple_dict
-    # set the iteration number
-    # total iteration number = restart number + 1
-    iteration_num = arguments.r + 1
-    if arguments.ms:
-        single_score = False
-    if arguments.v:
-        verbose = True
-    if arguments.vv:
-        veryVerbose = True
-    if arguments.pr:
-        pr_flag = True
-    # significant digits to print out
-    floatdisplay = "%%.%df" % arguments.significant
-    
-    start_time = time.time()
-    for (precision, recall, best_f_score) in score_amr_pairs(args.f[0], args.f[1],
-                                                             justinstance=arguments.justinstance,
-                                                             justattribute=arguments.justattribute,
-                                                             justrelation=arguments.justrelation,
-                                                             coref=arguments.coref_subscore):
-        # print("Sentence", sent_num)
-        if pr_flag:
-            print("Precision: " + floatdisplay % precision)
-            print("Recall: " + floatdisplay % recall)
-        print("F-score: " + floatdisplay % best_f_score)
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print("Time(s): "+str(floatdisplay % elapsed_time))
-        
-    args.f[0].close()
-    args.f[1].close()
 
-
-if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Smatch calculator")
@@ -1233,5 +1200,40 @@ if __name__ == "__main__":
         default=False,
         help="include subscores for coreference")
 
-    args = parser.parse_args()
-    main(args)
+    arguments = parser.parse_args()
+    
+    # set the iteration number
+    # total iteration number = restart number + 1
+    iteration_num = arguments.r + 1
+    if arguments.ms:
+        single_score = False
+    if arguments.v:
+        verbose = True
+    if arguments.vv:
+        veryVerbose = True
+    if arguments.pr:
+        pr_flag = True
+    # significant digits to print out
+    floatdisplay = "%%.%df" % arguments.significant
+    
+    start_time = time.time()
+    for (precision, recall, best_f_score) in score_amr_pairs(arguments.f[0], arguments.f[1],
+                                                             justinstance=arguments.justinstance,
+                                                             justattribute=arguments.justattribute,
+                                                             justrelation=arguments.justrelation,
+                                                             coref=arguments.coref_subscore):
+        # print("Sentence", sent_num)
+        if pr_flag:
+            print("Precision: " + floatdisplay % precision)
+            print("Recall: " + floatdisplay % recall)
+        print("F-score: " + floatdisplay % best_f_score)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print("Time(s): "+str(floatdisplay % elapsed_time))
+        
+    arguments.f[0].close()
+    arguments.f[1].close()
+
+
+if __name__ == "__main__":
+    main()

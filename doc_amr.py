@@ -53,60 +53,6 @@ def connect_sen_amrs(amr):
     for (i,root) in enumerate(amr.roots):
         amr.edges.append((amr.root, ":snt"+str(i+1), root))
 
-
-def main(args):
-
-    assert args.out_amr        
-
-    if args.amr3_path and args.coref_fof:
-        
-        # read cross sentenctial corefs from document AMR
-        coref_files = [args.amr3_path+"/"+line.strip() for line in open(args.coref_fof)]
-        corefs = process_corefs(coref_files)
-
-        # Read AMR
-        directory = args.amr3_path + r'/data/amrs/unsplit/'
-        amrs = {}
-        for filename in tqdm(os.listdir(directory), desc="Reading sentence-level AMRs"):
-            amrs.update(read_amr(directory+filename))
-
-        # write documents without corefs
-        plain_doc_amrs = make_doc_amrs(corefs,amrs,coref=False).values()
-        with open(args.out_amr+".nocoref", 'w') as fid:
-            for amr in plain_doc_amrs:
-                damr = copy.deepcopy(amr)
-                connect_sen_amrs(damr)
-                fid.write(damr.__str__())        
-        # add corefs into Documentr level AMRs
-        amrs = make_doc_amrs(corefs,amrs).values()
-        with open(args.out_amr, 'w') as fid:
-            for amr in amrs:
-                damr = copy.deepcopy(amr)
-                connect_sen_amrs(damr)
-                print("\nnormalizing "+damr.doc_file.split("/")[-1])
-                print("normalizing "+damr.amr_id)
-                damr.normalize(rep=args.rep, flip=args.flipped)
-                fid.write(damr.__str__())
-
-    if args.in_doc_amr_unmerged :
-        amrs = read_amr(args.in_doc_amr_unmerged).values()
-        with open(args.out_amr, 'w') as fid:
-            for amr in amrs:
-                damr = copy.deepcopy(amr)
-                print("\nnormalizing "+damr.amr_id)
-                damr.normalize(rep=args.rep, flip=args.flipped)
-                fid.write(damr.__str__())
-
-    if args.in_doc_amr_pairwise :
-        amrs = read_amr(args.in_doc_amr_pairwise).values()
-        with open(args.out_amr, 'w') as fid:
-            for amr in amrs:
-                damr = copy.deepcopy(amr)
-                print("\nnormalizing "+damr.amr_id)
-                damr.make_chains_from_pairs(args.pairwise_coref_rel)
-                damr.normalize(rep=args.rep, flip=args.flipped)
-                fid.write(damr.__str__())
-                
 def argument_parser():
 
     parser = argparse.ArgumentParser(description='Read AMRs and Corefs and put them together', \
@@ -160,6 +106,62 @@ def argument_parser():
     args = parser.parse_args()
     return args
 
+        
+def main():
+
+    args = argument_parser()
+    assert args.out_amr        
+
+    if args.amr3_path and args.coref_fof:
+        
+        # read cross sentenctial corefs from document AMR
+        coref_files = [args.amr3_path+"/"+line.strip() for line in open(args.coref_fof)]
+        corefs = process_corefs(coref_files)
+
+        # Read AMR
+        directory = args.amr3_path + r'/data/amrs/unsplit/'
+        amrs = {}
+        for filename in tqdm(os.listdir(directory), desc="Reading sentence-level AMRs"):
+            amrs.update(read_amr(directory+filename))
+
+        # write documents without corefs
+        plain_doc_amrs = make_doc_amrs(corefs,amrs,coref=False).values()
+        with open(args.out_amr+".nocoref", 'w') as fid:
+            for amr in plain_doc_amrs:
+                damr = copy.deepcopy(amr)
+                connect_sen_amrs(damr)
+                fid.write(damr.__str__())        
+        # add corefs into Documentr level AMRs
+        amrs = make_doc_amrs(corefs,amrs).values()
+        with open(args.out_amr, 'w') as fid:
+            for amr in amrs:
+                damr = copy.deepcopy(amr)
+                connect_sen_amrs(damr)
+                print("\nnormalizing "+damr.doc_file.split("/")[-1])
+                print("normalizing "+damr.amr_id)
+                damr.normalize(rep=args.rep, flip=args.flipped)
+                fid.write(damr.__str__())
+
+    if args.in_doc_amr_unmerged :
+        amrs = read_amr(args.in_doc_amr_unmerged).values()
+        with open(args.out_amr, 'w') as fid:
+            for amr in amrs:
+                damr = copy.deepcopy(amr)
+                print("\nnormalizing "+damr.amr_id)
+                damr.normalize(rep=args.rep, flip=args.flipped)
+                fid.write(damr.__str__())
+
+    if args.in_doc_amr_pairwise :
+        amrs = read_amr(args.in_doc_amr_pairwise).values()
+        with open(args.out_amr, 'w') as fid:
+            for amr in amrs:
+                damr = copy.deepcopy(amr)
+                print("\nnormalizing "+damr.amr_id)
+                damr.make_chains_from_pairs(args.pairwise_coref_rel)
+                damr.normalize(rep=args.rep, flip=args.flipped)
+                fid.write(damr.__str__())
+                
+
 
 if __name__ == '__main__':
-    main(argument_parser())
+    main()

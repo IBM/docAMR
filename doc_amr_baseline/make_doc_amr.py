@@ -9,7 +9,7 @@ import pickle
 import tqdm
 
 import argparse
-from baseline_io import (
+from .baseline_io import (
     
 
     read_amr_add_sen_id,
@@ -22,7 +22,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 from doc_amr import make_doc_amrs,connect_sen_amrs
 
-from amr_constituents import get_subgraph_by_id,get_constituents_from_subgraph
+from .amr_constituents import get_subgraph_by_id,get_constituents_from_subgraph
 
 
 
@@ -138,9 +138,8 @@ def process_coref_conll(amrs,coref_chains,add_coref=True,verbose=False,save_trip
     return corefs
                     
 
-
-
-if __name__ == "__main__":
+def main():
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('--path_to_coref',type=str,required=True)
     parser.add_argument('--path_to_amr',type=str,help='path to folder containing list of amr files per document',required=True)
@@ -280,14 +279,5 @@ if __name__ == "__main__":
                 fid.write(damr_str)
         fid.close()
 
-
-
-        
-
-    
-    
-    
-    
-
-
-
+if __name__ == "__main__":
+    main()
