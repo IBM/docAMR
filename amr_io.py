@@ -1022,7 +1022,7 @@ class AMR():
         else:
             sentence_ends = []
                 
-        return cls(tokens, nodes, edges, graph.top, penman=graph, sid=sid, nvars=nvars, sentence_ends=sentence_ends)
+        return cls(tokens, nodes, edges, graph.top, penman=graph,alignments=alignments, sid=sid, nvars=nvars, sentence_ends=sentence_ends)
 
     def delete_node_leaving_no_trace(self, node_id):
 
