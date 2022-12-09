@@ -494,18 +494,19 @@ class AMR():
                     #see if the kid should be merged recursively
                     if e[2] not in self.nodes:
                         edges_to_delete.append(e)
-                        print("edge node does not exist !!!")                    
-                    kid_form = (e[1],self.nodes[e[2]])
-                    if kid_form in node1_kids and node1_kids[kid_form] != e[2]:
-                        pair = (node1_kids[(e[1],self.nodes[e[2]])], e[2])
-                        if pair not in mergeable_kids:
-                            mergeable_kids.append(pair)
-                    #assign the kid to node1
-                    new_edge = (node1, e[1], e[2])
-                    if new_edge not in self.edges:
-                        self.edges[i] = new_edge
+                        print("edge node does not exist !!!") 
                     else:
-                        edges_to_delete.append(e)
+                        kid_form = (e[1],self.nodes[e[2]])
+                        if kid_form in node1_kids and node1_kids[kid_form] != e[2]:
+                            pair = (node1_kids[(e[1],self.nodes[e[2]])], e[2])
+                            if pair not in mergeable_kids:
+                                mergeable_kids.append(pair)
+                        #assign the kid to node1
+                        new_edge = (node1, e[1], e[2])
+                        if new_edge not in self.edges:
+                            self.edges[i] = new_edge
+                        else:
+                            edges_to_delete.append(e)
                         
                 elif e[1] == ":name":
                     new_node_name = self.get_name_str(e[2])
