@@ -1,0 +1,29 @@
+
+   
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "docAMR"
+version = '0.1.1'
+authors = [
+  { name="Sadhana", email="sadhana.kumaravel1@ibm.com" },
+  { name="Tahira", email="tnaseem@us.ibm.com" },
+  { name="GX", email="GX.Xu@ibm.com" },
+]
+description = "The package for docAMR"
+readme = "README.md"
+requires-python = "~=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX :: Linux",
+]
+
+[tool.poetry.platforms]
+os = "linux"
+
+[project.urls]
+"Homepage" = "https://github.com/IBM/docAMR"
+"Bug Tracker" = "https://github.com/IBM/docAMR/issues"
