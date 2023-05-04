@@ -38,7 +38,11 @@ Recommended representation based on the [paper](https://aclanthology.org/2022.na
 Each file inside the folder <path_to_tokenized_sentence_amrs> should
 1. End with extension '.amr'
 2. Contain sentence amrs for all sentences in the document seperated by a newline
-3. Contain metadata information about the AMR parse such as alignments. See example below
+3. Contain metadata information about the AMR parse such as alignments and node id. 
+
+See example folder for sample .amr file
+
+
 
 ## Run DocAMR Baseline test
 

@@ -1,0 +1,114 @@
+# ::tok Hailey is going to London tomorrow .
+# ::node	p	person	0-1
+# ::node	n	name	0-1
+# ::node	0	Hailey	0-1
+# ::node	g	go-02	2-3
+# ::node	c	city	4-5
+# ::node	n2	name	4-5
+# ::node	1	London	4-5
+# ::node	t	tomorrow	5-6
+# ::root	g	go-02
+# ::edge	person	name	name	p	n	
+# ::edge	name	op1	Hailey	n	0	
+# ::edge	go-02	ARG0	person	g	p	
+# ::edge	go-02	ARG4	city	g	c	
+# ::edge	city	name	name	c	n2	
+# ::edge	name	op1	London	n2	1	
+# ::edge	go-02	time	tomorrow	g	t	
+(g / go-02
+    :ARG0 (p / person
+        :name (n / name
+            :op1 "Hailey"))
+    :ARG4 (c / city
+        :name (n2 / name
+            :op1 "London"))
+    :time (t / tomorrow))
+
+# ::tok She is planning to go to Italy after London .
+# ::node	s	she	0-1
+# ::node	p	plan-01	2-3
+# ::node	g	go-02	4-5
+# ::node	c2	country	6-7
+# ::node	n	name	6-7
+# ::node	0	Italy	6-7
+# ::node	a	after	7-8
+# ::node	c	city	8-9
+# ::node	n2	name	8-9
+# ::node	1	London	8-9
+# ::root	p	plan-01
+# ::edge	plan-01	ARG0	she	p	s	
+# ::edge	plan-01	ARG1	go-02	p	g	
+# ::edge	go-02	ARG0	she	g	s	
+# ::edge	go-02	ARG4	country	g	c2	
+# ::edge	country	name	name	c2	n	
+# ::edge	name	op1	Italy	n	0	
+# ::edge	go-02	time	after	g	a	
+# ::edge	after	op1	city	a	c	
+# ::edge	city	name	name	c	n2	
+# ::edge	name	op1	London	n2	1	
+(p / plan-01
+    :ARG0 (s / she)
+    :ARG1 (g / go-02
+        :ARG0 s
+        :ARG4 (c2 / country
+            :name (n / name
+                :op1 "Italy"))
+        :time (a / after
+            :op1 (c / city
+                :name (n2 / name
+                    :op1 "London")))))
+
+# ::tok She is going to see the Big Ben .
+# ::node	s2	she	0-1
+# ::node	s	see-01	4-5
+# ::node	b	building	6-7
+# ::node	n	name	6-7
+# ::node	1	Big	6-7
+# ::node	0	Ben	7-8
+# ::root	s	see-01
+# ::edge	see-01	ARG0	she	s	s2	
+# ::edge	see-01	ARG1	building	s	b	
+# ::edge	building	name	name	b	n	
+# ::edge	name	op1	Big	n	1	
+# ::edge	name	op2	Ben	n	0	
+(s / see-01
+    :ARG0 (s2 / she)
+    :ARG1 (b / building
+        :name (n / name
+            :op1 "Big"
+            :op2 "Ben")))
+
+# ::tok Her friend Phil is meeting her in London .
+# ::node	s	she	0-1
+# ::node	h	have-rel-role-91	1-2
+# ::node	f	friend	1-2
+# ::node	p	person	2-3
+# ::node	n	name	2-3
+# ::node	1	Phil	2-3
+# ::node	m	meet-03	4-5
+# ::node	c	city	7-8
+# ::node	n2	name	7-8
+# ::node	0	London	7-8
+# ::root	m	meet-03
+# ::edge	have-rel-role-91	ARG1	she	h	s	
+# ::edge	have-rel-role-91	ARG2	friend	h	f	
+# ::edge	person	ARG0-of	have-rel-role-91	p	h	
+# ::edge	person	name	name	p	n	
+# ::edge	name	op1	Phil	n	1	
+# ::edge	meet-03	ARG0	person	m	p	
+# ::edge	meet-03	ARG1	she	m	s	
+# ::edge	meet-03	location	city	m	c	
+# ::edge	city	name	name	c	n2	
+# ::edge	name	op1	London	n2	0	
+(m / meet-03
+    :ARG0 (p / person
+        :name (n / name
+            :op1 "Phil")
+        :ARG0-of (h / have-rel-role-91
+            :ARG1 (s / she)
+            :ARG2 (f / friend)))
+    :ARG1 s
+    :location (c / city
+        :name (n2 / name
+            :op1 "London")))
+
