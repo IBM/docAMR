@@ -8,40 +8,7 @@ from collections import defaultdict
 
 alignment_regex = re.compile('(-?[0-9]+)-(-?[0-9]+)')
 class AMR2(AMR):
-    @classmethod
-    def fix_alignments(self,removed_idx):
-        for node_id,align in self.alignments.items():
-            if align is not None:
-                num_decr = len([rm for rm in removed_idx if align[0]>rm])
-                if num_decr>0:
-                    lst = [x-num_decr for x in align]
-                    self.alignments[node_id] = lst 
-
-
-    @classmethod
-    def get_sen_ends(self):
-        self.sentence_ends = []
-        removed_idx = []
-        new_tokens = []
-        for idx,tok in enumerate(self.tokens):
-            if tok=='<next_sent>':
-                self.sentence_ends.append(len(new_tokens)-1)
-                removed_idx.append(idx)
-            else:
-                new_tokens.append(tok)
-        self.sentence_ends.append(len(new_tokens)-1)
-        self.tokens = new_tokens
-        self.fix_alignments(removed_idx)
-        
-    @classmethod
-    #FIXME
-    def remove_unicode(self):
-        for idx,tok in enumerate(self.tokens):
-            new_tok = tok.encode("ascii", "ignore")
-            self.tokens[idx] = new_tok.decode()
-            if self.tokens[idx]=='':
-                self.tokens[idx]='.'
-
+    
     @classmethod
     def get_all_vars(cls, penman_str):
         in_quotes = False
