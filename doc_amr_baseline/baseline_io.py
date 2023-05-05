@@ -8,6 +8,7 @@ from collections import defaultdict
 
 alignment_regex = re.compile('(-?[0-9]+)-(-?[0-9]+)')
 class AMR2(AMR):
+    
     @classmethod
     def get_all_vars(cls, penman_str):
         in_quotes = False
@@ -132,7 +133,8 @@ class AMR2(AMR):
         alignments = {}
         edges = []
         root = None
-
+        sentence = None
+    
         if 'short' in metadata:
             short_str = metadata["short"][0].split('\t')[1]
             short = eval(short_str)
@@ -142,6 +144,7 @@ class AMR2(AMR):
             short = None
             all_vars = AMR2.get_all_vars(penman_str)
         
+
         for key, value in metadata.items():
             if key == 'edge':
                 for items in value:
@@ -164,12 +167,11 @@ class AMR2(AMR):
                     if short is not None:
                         var = short[node_id]
                     else:
-                        var = AMR2.get_node_var(penman_str, node_id)
+                        var = node_id
                     if var is not None and var+" / " not in penman_str:
                         nvars[node_id] = None
                     else:
                         nvars[node_id] = var
-                    if var != None:
                         all_vars.remove(var)
             elif key == 'root':
                 root = value[0].split('\t')[1]
@@ -335,3 +337,4 @@ def read_amr_str_add_sen_id(amr_strs,doc_id,tokenize=False):
         raw_amrs[amr.sid] = amr
             
     return raw_amrs
+

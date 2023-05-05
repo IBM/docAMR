@@ -1,0 +1,37 @@
+# ::id sentence_test
+# ::doc_file sentence_test
+# ::tok Hailey is going to London tomorrow . <next_sent> She is planning to go to Italy after London . <next_sent> She is going to see the Big Ben . <next_sent> Her friend Phil is meeting her in London .
+(d / document
+   :snt1 (s1.g / go-02
+               :ARG0 (s1.p / person
+                           :name (s1.n / name
+                                       :op1 "Hailey"))
+               :ARG4 (s2.c / city
+                           :name (s2.n2 / name
+                                        :op1 "London"))
+               :time (s1.t / tomorrow))
+   :snt2 (s2.p / plan-01
+               :ARG0 (pro / she)
+               :ARG1 (s2.g / go-02
+                           :ARG0 pro
+                           :ARG4 (s2.c2 / country
+                                        :name (s2.n / name
+                                                    :op1 "Italy"))
+                           :time (s2.a / after
+                                       :op1 s2.c)))
+   :snt3 (s3.s / see-01
+               :ARG0 pro
+               :ARG1 (s3.b / building
+                           :name (s3.n / name
+                                       :op1 "Big"
+                                       :op2 "Ben")))
+   :snt4 (s4.m / meet-03
+               :ARG0 (s4.p / person
+                           :name (s4.n / name
+                                       :op1 "Phil")
+                           :ARG0-of (s4.h / have-rel-role-91
+                                          :ARG1 pro
+                                          :ARG2 (s4.f / friend)))
+               :ARG1 pro
+               :location s2.c))
+
