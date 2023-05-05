@@ -42,6 +42,10 @@ Each file inside the folder <path_to_tokenized_sentence_amrs> should
 
 See example folder for sample .amr file
 
+To get sentence amrs , please checkout this parser :
+https://github.com/IBM/transition-amr-parser
+
+Note: To get an amr in the same format as the example in the folder , use --jamr and --no-isi as arguments to the amr-parse command while use this parser.
 
 
 ## Run DocAMR Baseline test
